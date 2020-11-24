@@ -55,7 +55,7 @@ public class ApplicationJava {
     public void run(){
         createMongoBD();
         structuremiroir();
-        
+        rechercheMongoEnvoyerNeo ();
         closeConnexion();
     }
     
@@ -113,26 +113,19 @@ public class ApplicationJava {
                 motCles = (List<String>) doc.get("motsCles");
                 for ( String mot : motCles){
                     Document document = findByMotCle(collectionIndexeInverse,mot);
-                    System.out.println(document + mot);
                 if (document !=null){
-                UpdateResult updateResult = collectionIndexeInverse.updateOne(
-                Filters.eq("mot", mot), // Condition
-                Updates.push("idDocuments", doc.get("idDocument")) // Mise à jour
-                );
-                // Affiche le nombre de documents modifiés
-                System.out.println("Nb de documents modifiés : "+updateResult.getModifiedCount());
-                    /* Document setData = new Document();
-                            setData.append("idDocuments", doc.get("idDocument"));
-                            Document update = new Document();
-                            update.append("$set", setData);
-                            //To update single Document  
-                            collectionIndexeInverse.updateOne(document, update);
-                */
+                    UpdateResult updateResult = collectionIndexeInverse.updateOne(
+                    Filters.eq("mot", mot), // Condition
+                    Updates.push("Documents", doc.get("idDocument")) // Mise à jour
+                    );
+                    // Affiche le nombre de documents modifiés
+                    System.out.println("Nb de documents modifiés : "+updateResult.getModifiedCount());
+
                 }else {
                         List<Integer> idDocuments = new ArrayList<>();
                         idDocuments.add((Integer) doc.get("idDocument"));
                         Document newInput = new Document("mot", mot)
-                                .append("idDocuments",idDocuments);
+                                .append("Documents",idDocuments);
                         collectionIndexeInverse.insertOne(newInput);
                 }
                 
@@ -146,6 +139,27 @@ public class ApplicationJava {
      private static Document findByMotCle( MongoCollection<Document> collection,String motcle){
         Document document = collection.find(Filters.eq("mot", motcle)).first();
         return document;
+    }
+     
+    public void rechercheMongoEnvoyerNeo (){
+        Scanner myObj = new Scanner(System.in);  // Create a Scanner object
+        System.out.println("Enter mot");
+        String mot = myObj.nextLine();  // Read user input
+        Document docMongo = findByMotCle(collectionIndexeInverse, mot);
+        ArrayList<Integer> documents = (ArrayList<Integer>) docMongo.get("Documents");
+        String str =  ("MATCH (a:Article)" +
+                        "WHERE id(a) in" + documents +
+                        "RETURN a.titre order by a.titre asc ") ;
+         StatementResult result = session.run( str );
+         Integer cpt = 0;
+         while ( result.hasNext() ){       
+            Record record = result.next();
+            String chaine = record.get( "a.titre" ).asString();
+             System.out.println(chaine);
+            cpt+=1;
+         }
+          System.out.println("Le nombre d'articles:"+cpt);
+        
     }
     
 }

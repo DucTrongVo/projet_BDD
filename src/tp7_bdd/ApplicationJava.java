@@ -5,11 +5,14 @@
  */
 package tp7_bdd;
 
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import static com.mongodb.client.model.Filters.eq;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 import java.util.ArrayList;
@@ -18,6 +21,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import org.bson.BsonDocument;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.neo4j.driver.v1.Driver;
 import org.neo4j.driver.v1.Record;
 import org.neo4j.driver.v1.Session;
@@ -77,11 +81,11 @@ public class ApplicationJava {
             Record record = result.next();
             String chaine = record.get( "a.titre" ).asString();
             String chaineEnMinuscule = chaine.toLowerCase();
-            StringTokenizer st = new StringTokenizer (chaineEnMinuscule, "‘'-:;.()+[]{}?!= &");
+            StringTokenizer st = new StringTokenizer (chaineEnMinuscule, "‘'-:;.,()+[]{}?!= &");
             List<String> motCles = new ArrayList<>();
             while (st.hasMoreTokens()){
                 // Récupération du mot suivant
-                String mot = st.nextToken();
+                String mot = st.nextToken().trim();
                 motCles.add(mot);
             }
             Document newInput = new Document("idDocument", record.get( "id").asInt())
@@ -109,24 +113,32 @@ public class ApplicationJava {
                 motCles = (List<String>) doc.get("motsCles");
                 for ( String mot : motCles){
                     Document document = findByMotCle(collectionIndexeInverse,mot);
+                    System.out.println(document + mot);
                 if (document !=null){
-                    UpdateResult updateResult = collectionIndexeInverse.updateOne(
-                       Filters.eq("mot", mot),
-                       // Condition
-                       Updates.set("idDocuments", doc.get("idDocument"))
-                       // Mise à jour
-                       );
-          
+                UpdateResult updateResult = collectionIndexeInverse.updateOne(
+                Filters.eq("mot", mot), // Condition
+                Updates.push("idDocuments", doc.get("idDocument")) // Mise à jour
+                );
+                // Affiche le nombre de documents modifiés
+                System.out.println("Nb de documents modifiés : "+updateResult.getModifiedCount());
+                    /* Document setData = new Document();
+                            setData.append("idDocuments", doc.get("idDocument"));
+                            Document update = new Document();
+                            update.append("$set", setData);
+                            //To update single Document  
+                            collectionIndexeInverse.updateOne(document, update);
+                */
                 }else {
+                        List<Integer> idDocuments = new ArrayList<>();
+                        idDocuments.add((Integer) doc.get("idDocument"));
                         Document newInput = new Document("mot", mot)
-                                .append("idDocuments",doc.get("idDocument"));
+                                .append("idDocuments",idDocuments);
                         collectionIndexeInverse.insertOne(newInput);
                 }
-
+                
                  
-                       
-                   
                 }
+               
                     
             }
             }

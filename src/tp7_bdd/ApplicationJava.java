@@ -9,6 +9,9 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -32,6 +35,7 @@ public class ApplicationJava {
     Scanner clavier;
     MongoDatabase database;
     MongoCollection<Document> collection;
+    MongoCollection<Document> collectionIndexeInverse;
     
     public ApplicationJava(Session session, Driver driver, MongoClient mongoClient){
         this.session = session;
@@ -41,10 +45,12 @@ public class ApplicationJava {
         
         database = mongoClient.getDatabase("dbDocuments");
         collection = database.getCollection("index");
+        collectionIndexeInverse =database.getCollection("indexInverse");
     };
     
     public void run(){
         createMongoBD();
+        structuremiroir();
         
         closeConnexion();
     }
@@ -71,7 +77,7 @@ public class ApplicationJava {
             Record record = result.next();
             String chaine = record.get( "a.titre" ).asString();
             String chaineEnMinuscule = chaine.toLowerCase();
-            StringTokenizer st = new StringTokenizer (chaineEnMinuscule, "‘-:;.()+[]{}?!= ");
+            StringTokenizer st = new StringTokenizer (chaineEnMinuscule, "‘'-:;.()+[]{}?!= &");
             List<String> motCles = new ArrayList<>();
             while (st.hasMoreTokens()){
                 // Récupération du mot suivant
@@ -91,4 +97,43 @@ public class ApplicationJava {
           collection.deleteMany(document);
         }
     }
+    
+    public void structuremiroir(){
+           //removeAllDocument();
+        collectionIndexeInverse.deleteMany(new BsonDocument());
+        
+        //Copie des indexes
+         FindIterable<Document> documents = collection.find();
+            for (Document doc : documents){
+                List<String> motCles = new ArrayList<>();
+                motCles = (List<String>) doc.get("motsCles");
+                for ( String mot : motCles){
+                    Document document = findByMotCle(collectionIndexeInverse,mot);
+                if (document !=null){
+                    UpdateResult updateResult = collectionIndexeInverse.updateOne(
+                       Filters.eq("mot", mot),
+                       // Condition
+                       Updates.set("idDocuments", doc.get("idDocument"))
+                       // Mise à jour
+                       );
+          
+                }else {
+                        Document newInput = new Document("mot", mot)
+                                .append("idDocuments",doc.get("idDocument"));
+                        collectionIndexeInverse.insertOne(newInput);
+                }
+
+                 
+                       
+                   
+                }
+                    
+            }
+            }
+                
+     private static Document findByMotCle( MongoCollection<Document> collection,String motcle){
+        Document document = collection.find(Filters.eq("mot", motcle)).first();
+        return document;
+    }
+    
 }

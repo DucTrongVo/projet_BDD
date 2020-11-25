@@ -56,6 +56,7 @@ public class ApplicationJava {
         createMongoBD();
         structuremiroir();
         rechercheMongoEnvoyerNeo ();
+        top10Auteur();
         closeConnexion();
     }
     
@@ -161,5 +162,17 @@ public class ApplicationJava {
           System.out.println("Le nombre d'articles:"+cpt);
         
     }
+    
+    public void top10Auteur(){
+     String str =  "match(a:Auteur)-[e:Ecrire]->(ar:Article)return count(e),a.nom order by count(e) desc ,a.nom asc limit 10";
+     StatementResult result = session.run( str );
+     while ( result.hasNext() ){       
+            Record record = result.next();
+            String chaine = record.get( "count(e)" ).asInt()+" - "+record.get( "a.nom" ).asString();
+            System.out.println(chaine);
+    }
+    }
+    
+    
     
 }

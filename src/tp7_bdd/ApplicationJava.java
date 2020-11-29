@@ -8,14 +8,24 @@ package tp7_bdd;
 import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
+import com.mongodb.client.AggregateIterable;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import static com.mongodb.client.model.Accumulators.sum;
+import static com.mongodb.client.model.Aggregates.group;
+import static com.mongodb.client.model.Aggregates.limit;
+import static com.mongodb.client.model.Aggregates.match;
+import static com.mongodb.client.model.Aggregates.sort;
+import static com.mongodb.client.model.Aggregates.unwind;
 import com.mongodb.client.model.Filters;
 import static com.mongodb.client.model.Filters.eq;
+import com.mongodb.client.model.Indexes;
+import static com.mongodb.client.model.Indexes.descending;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 import java.util.StringTokenizer;
@@ -29,7 +39,7 @@ import org.neo4j.driver.v1.StatementResult;
 
 /**
  *
- * @author trongvo
+ * @author CarlosFL97
  */
 public class ApplicationJava {
     Session session;
@@ -57,6 +67,7 @@ public class ApplicationJava {
         structuremiroir();
         rechercheMongoEnvoyerNeo ();
         top10Auteur();
+        recherche();
         closeConnexion();
     }
     
@@ -96,12 +107,6 @@ public class ApplicationJava {
             }
     }
     
-    private void removeAllDocument(){
-        FindIterable<Document> findIterable = collection.find();
-        for (Document document : findIterable) {
-          collection.deleteMany(document);
-        }
-    }
     
     public void structuremiroir(){
            //removeAllDocument();
@@ -110,8 +115,7 @@ public class ApplicationJava {
         //Copie des indexes
          FindIterable<Document> documents = collection.find();
             for (Document doc : documents){
-                List<String> motCles = new ArrayList<>();
-                motCles = (List<String>) doc.get("motsCles");
+                List<String> motCles = (List<String>) doc.get("motsCles");
                 for ( String mot : motCles){
                     Document document = findByMotCle(collectionIndexeInverse,mot);
                 if (document !=null){
@@ -173,6 +177,39 @@ public class ApplicationJava {
     }
     }
     
+    public void recherche(){
+    Scanner clavier = new Scanner(System.in);
+    List<String> motscherche= new ArrayList<>();
+    System.out.println("Saisir vos mots, enter sans mots pour arrêter)");
+    String mot;
+    while ((mot=clavier.nextLine()).length()>0){
+        motscherche.add(mot);
+    }
+   
+    Bson match = match(Filters.in("mot", motscherche));
+    Bson unwind  = unwind( "$Documents");
+    Bson group = group("$Documents",sum("nb", 1));
+    Bson sort  = sort(descending("nb"));
+    Bson limit = limit(10);
+    AggregateIterable<Document> documents = collectionIndexeInverse.aggregate(Arrays.asList(match,unwind,group,sort,limit));
+    
+    int idNeo;
+    int nbMots;
+    StatementResult result;
+    String str;
+     Record enr;
+     String titre;
+    for (Document doc : documents){
+            idNeo = doc.getInteger("_id");
+            nbMots = doc.getInteger("nb");
+            str = "Match (a:Article) where id(a)="+idNeo+ " return a.titre ";
+            result = session.run( str );
+            enr =result.next();
+            titre = enr.get("a.titre").asString();
+            System.out.println(idNeo+" - "+titre+" "+nbMots);
+    }
+      
+    }
     
     
 }
